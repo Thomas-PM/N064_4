@@ -1,4 +1,20 @@
-nclude <stdio.h>
+/*
+    Name 1: Thomas McRoberts
+    UTEID 1: tpm627
+*/
+
+/***************************************************************/
+/*                                                             */
+/*   LC-3b Simulator                                           */
+/*                                                             */
+/*   EE 460N                                                   */
+/*   The University of Texas at Austin                         */
+/*                                                             */
+/***************************************************************/
+
+
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -39,9 +55,9 @@ void latch_datapath_values();
 /***************************************************************/
 /* Definition of bit order in control store word.              */
 /***************************************************************/
-enum CS_BITS {                                                  
+enum CS_BITS {                  //* <- denotes added for lab 4 (interupts and exceptions)                        
     IRD,
-    COND1, COND0,
+    COND2, COND1, COND0,        //* COND2
     J5, J4, J3, J2, J1, J0,
     LD_MAR,
     LD_MDR,
@@ -50,22 +66,34 @@ enum CS_BITS {
     LD_REG,
     LD_CC,
     LD_PC,
+	LD_PRIV,                    //*
+	LD_SSP,                     //*
+	LD_USP,                     //*
+	LD_VECTOR,                  //*
     GATE_PC,
     GATE_MDR,
     GATE_ALU,
     GATE_MARMUX,
     GATE_SHF,
+	GATE_VECTOR,                //*
+	GATE_PC_Minus,              //*
+	GATE_PSR,                   //*
+	GATE_SP,                    //*
     PCMUX1, PCMUX0,
     DRMUX,
     SR1MUX,
     ADDR1MUX,
     ADDR2MUX1, ADDR2MUX0,
+    SP_MUX1, SP_MUX0,           //*
     MARMUX,
+	VECTOR_MUX1, VECTOR_MUX0,   //*
+	PSR_MUX,                    //*
     ALUK1, ALUK0,
     MIO_EN,
     R_W,
     DATA_SIZE,
     LSHF1,
+    SET_PRIV,                   //*	
 /* MODIFY: you have to add all your new control signals */
     CONTROL_STORE_BITS
 } CS_BITS;
@@ -74,10 +102,8 @@ enum CS_BITS {
 /* Functions to get at the control bits.                       */
 /***************************************************************/
 int GetIRD(int *x)           { return(x[IRD]); }
-int GetCOND(int *x)          { return((x[COND1] << 1) + x[COND0]); }
-int GetJ(int *x)             { return((x[J5] << 5) + (x[J4] << 4) +
-				      (x[J3] << 3) + (x[J2] << 2) +
-				      (x[J1] << 1) + x[J0]); }
+int GetCOND(int *x)          { return((x[cond2] << 2) + (x[COND1] << 1) + x[COND0]); }
+int GetJ(int *x)             { return((x[J5] << 5) + (x[J4] << 4) + (x[J3] << 3) + (x[J2] << 2) + (x[J1] << 1) + x[J0]); }
 int GetLD_MAR(int *x)        { return(x[LD_MAR]); }
 int GetLD_MDR(int *x)        { return(x[LD_MDR]); }
 int GetLD_IR(int *x)         { return(x[LD_IR]); }
@@ -574,64 +600,319 @@ int main(int argc, char *argv[]) {
    Begin your code here 	  			       */
 /***************************************************************/
 
+int sext(int num, int bits){
+	int sign = (num >> (bits - 1)) & 0x1;
+	int ret;
+	ret = 0xFFFF << bits;
 
-void eval_micro_sequencer() {
+	if(sign){
+		ret = ret | num;
+ 	}
+	else{
+		ret = (~ret) & num;
+	}
 
-  /* 
-   * Evaluate the address of the next state according to the 
-   * micro sequencer logic. Latch the next microinstruction.
-   */
+	return ret;
+}
+  
 
+
+
+/* 
+ * Evaluate the address of the next state according to the 
+ * micro sequencer logic. Latch the next microinstruction.
+ */
+void eval_micro_sequencer() {	
+	
+    
+    int COND = GetCOND(CURRENT_LATCHES.MICROINSTRUCTION);
+	int BEN = CURRENT_LATCHES.BEN;
+    if(BEN){
+    }
+	int R  = CURRENT_LATCHES.READY;
+ 	int IR11 = (CURRENT_LATCHES.IR >> 11) & 0x1;
+	int opcode[4];
+    int i = 0;
+    printf("opcode:");
+    for(i = 0; i < 4; i++){
+        opcode[i] = (CURRENT_LATCHES.IR >> (i + 12) ) & 0x1;
+        printf("%d", opcode[i]);
+    }
+    printf("\n");
+	int IRD = GetIRD(CURRENT_LATCHES.MICROINSTRUCTION); 
+	int nextStateAddr[6];
+    int J = GetJ(CURRENT_LATCHES.MICROINSTRUCTION);
+    
+    if(IRD){
+        nextStateAddr[0] = opcode[0];
+        nextStateAddr[1] = opcode[1];
+        nextStateAddr[2] = opcode[2];
+        nextStateAddr[3] = opcode[3];
+        nextStateAddr[4] = 0;
+        nextStateAddr[5] = 0;
+    }
+    else{
+        nextStateAddr[0] = (J & 0x1) || ( (COND == 3) && IR11);
+        nextStateAddr[1] = ( (J >> 1) & 0x1) || ( (COND == 1) && R);
+        nextStateAddr[2] = ( (J >> 2) & 0x1) || ( (COND == 2) && BEN);
+        nextStateAddr[3] = ( (J >> 3) & 0x1);
+        nextStateAddr[4] = ( (J >> 4) & 0x1);
+        nextStateAddr[5] = ( (J >> 5) & 0x1);
+
+    }
+    int nextState = nextStateAddr[0] + 2*nextStateAddr[1] + 4*nextStateAddr[2] + 8*nextStateAddr[3] + 16*nextStateAddr[4] + 32*nextStateAddr[5];
+    printf("**************Current state %d\n", CURRENT_LATCHES.STATE_NUMBER);
+    NEXT_LATCHES.STATE_NUMBER = nextState;
+    printf("**************NEXT state %d\n",NEXT_LATCHES.STATE_NUMBER);
+	for(i = 0; i < CONTROL_STORE_BITS; i++){
+        printf("%d", CONTROL_STORE[nextState][i]);
+        NEXT_LATCHES.MICROINSTRUCTION[i] = CONTROL_STORE[nextState][i];
+    }
+    printf("\n");
 }
 
+
+
+/* 
+ * This function emulates memory and the WE logic. 
+ * Keep track of which cycle of MEMEN we are dealing with.  
+ * If fourth, we need to latch Ready bit at the end of 
+ * cycle to prepare microsequencer for the fifth cycle.  
+ */
+
+int memCycles = 0;
 
 void cycle_memory() {
- 
-  /* 
-   * This function emulates memory and the WE logic. 
-   * Keep track of which cycle of MEMEN we are dealing with.  
-   * If fourth, we need to latch Ready bit at the end of 
-   * cycle to prepare microsequencer for the fifth cycle.  
-   */
+    if( GetMIO_EN(CURRENT_LATCHES.MICROINSTRUCTION) ){
+        /*  Enable memory  */
+        if(CURRENT_LATCHES.READY){
+            NEXT_LATCHES.READY = 0;
+            memCycles = 0;
+        }
+        else{
+            if(memCycles == 3){
+                /*  Memory Access  */
+                if(GetR_W(CURRENT_LATCHES.MICROINSTRUCTION) == 0){
+                    /*  Read  */
+                    if(GetDATA_SIZE(CURRENT_LATCHES.MICROINSTRUCTION) == 0){
+                        /* byte */
+                        NEXT_LATCHES.MDR = (MEMORY[CURRENT_LATCHES.MAR >> 1][0] + (MEMORY[CURRENT_LATCHES.MAR >> 1][1] << 8) );
+                    }
+                    else{
+                        /* word */ 
+                        NEXT_LATCHES.MDR = (MEMORY[CURRENT_LATCHES.MAR >> 1][0] + (MEMORY[CURRENT_LATCHES.MAR >> 1][1] << 8) );
+                    }
+                
+                printf("  MDR= 0x%4x\n", NEXT_LATCHES.MDR); 
+                }
+                else{
+                    /* WRITE */
+                    if(GetDATA_SIZE(CURRENT_LATCHES.MICROINSTRUCTION) == 0){
+                        /* byte */
+                        int data = CURRENT_LATCHES.MDR & 0xFF;
+                        MEMORY[CURRENT_LATCHES.MAR >> 1][CURRENT_LATCHES.MAR & 0x1] = data;
 
+                    }
+                    else{
+                        /* word */ 
+                        int hibyte = (CURRENT_LATCHES.MDR >> 8) & 0xFF;
+                        int lobyte = CURRENT_LATCHES.MDR & 0xFF;
+                        MEMORY[CURRENT_LATCHES.MAR >> 1][1] = hibyte;
+                        MEMORY[CURRENT_LATCHES.MAR >> 1][0] = lobyte;
+                    }
+                }
+                
+                NEXT_LATCHES.READY = 1;
+            }
+        }
+
+    memCycles ++;
+    }
 }
 
 
 
+int outSR1 = 0;
+int outSR2MUX = 0;
+int outALU = 0;
+int outSHF = 0;
+
+int outADDR2MUX = 0;
+int outLSFH1 = 0;
+int outADDR1MUX = 0;
+int outADDRALU = 0;
+int outPCMUX = 0;
+int outMARMUX = 0;
+
+int outMDRMUX = 0;
+int outMDRtoBUSLOGIC = 0;
+int outBUStoMDRLOGIC = 0;
+/* 
+ * Datapath routine emulating operations before driving the bus.
+ * Evaluate the input of tristate drivers 
+ *      Gate_MARMUX,
+ *		Gate_PC,
+ *		Gate_ALU,
+ *		Gate_SHF,
+ *		Gate_MDR.
+ */   
 void eval_bus_drivers() {
+    int* uinstr = CURRENT_LATCHES.MICROINSTRUCTION;
+    /*  set SR1  */
+    if(GetSR1MUX(uinstr)){
+        outSR1 = CURRENT_LATCHES.REGS[ (CURRENT_LATCHES.IR >> 6) & 0x7];
+    }
+    else{   
+        outSR1 = CURRENT_LATCHES.REGS[ (CURRENT_LATCHES.IR >> 9) & 0x7];
+    }
+	outSR1 = Low16bits(outSR1);
+    printf("SR1 0x%4x\n", outSR1);
 
-  /* 
-   * Datapath routine emulating operations before driving the bus.
-   * Evaluate the input of tristate drivers 
-   *             Gate_MARMUX,
-   *		 Gate_PC,
-   *		 Gate_ALU,
-   *		 Gate_SHF,
-   *		 Gate_MDR.
-   */    
+    /*  set SR2  */
+    if( (CURRENT_LATCHES.IR >> 5) & 0x1){
+        outSR2MUX = sext(CURRENT_LATCHES.IR & 0x1F, 5);
+    }
+    else{
+        outSR2MUX = CURRENT_LATCHES.REGS[ (CURRENT_LATCHES.IR) & 0x3];
+    }
+    outSR2MUX = Low16bits(outSR2MUX);
+	
+    /*  Set ALU  */	
+    switch(GetALUK(uinstr)) {
+    case 0:
+        outALU = outSR1 + outSR2MUX; 
+        break;
 
+    case 1:
+        outALU = outSR1 & outSR2MUX;
+        break;
+
+    case 2:
+        outALU = outSR1 ^ outSR2MUX;
+        break;
+
+    case 3:
+        outALU = outSR1;
+        break;
+    defualt:
+        break;
+    }
+    outALU = Low16bits(outALU);
+    
+
+    /*  Set SHF  */
+    int amount4 = (CURRENT_LATCHES.IR & 0xF);
+    int sign = ( (outSR1 >> 15) & 0x1 );
+    int highbits = 0xFF << (16 - amount4);
+    switch( (CURRENT_LATCHES.IR >> 4) & 0x3){
+    case 0: 
+        outSHF = outSR1 << amount4;
+        break;
+    case 1:
+        outSHF = (outSR1 >> amount4) & (~highbits);
+        break;
+    case 3:
+        outSHF = (outSR1 >> amount4) | highbits*sign; 
+        break;
+    default:
+        break;
+
+    }
+    outSHF = Low16bits(outSHF);
+
+    /*  Set ADDR2MUX  */
+    switch(GetADDR2MUX(uinstr)){
+    case 0:
+        outADDR2MUX = 0;
+        break;
+    case 1:
+        outADDR2MUX = sext(CURRENT_LATCHES.IR & 0x3F, 6);
+        break;
+    case 2:
+        outADDR2MUX = sext(CURRENT_LATCHES.IR & 0x1FF, 9);
+        break;
+    case 3:
+        outADDR2MUX = sext(CURRENT_LATCHES.IR & 0x7FF, 11);
+        break;
+    default:
+        printf("Addr2MUX error");
+        break;
+    }
+    outADDR2MUX = Low16bits(outADDR2MUX);
+    printf("outADDR2MUX = 0x%4x\n", outADDR2MUX);
+    
+    /*  Set LSFH1  */
+    if(GetLSHF1(uinstr)){
+        outLSFH1 = outADDR2MUX << 1;
+    }
+    else{
+        outLSFH1 = outADDR2MUX;
+    }
+    outLSFH1 = Low16bits(outLSFH1);
+    printf("LSHF1 = 0x%4x\n", outLSFH1);
+
+    /*  Set ADDR1MUX  */
+    if(GetADDR1MUX(uinstr) == 0){
+        outADDR1MUX = CURRENT_LATCHES.PC;
+    }
+    else{
+        outADDR1MUX = outSR1;
+    }
+    outADDR1MUX = Low16bits(outADDR1MUX);
+    printf("ADDR1MUX = 0x%4x\n", outADDR1MUX);
+
+    /*  Set ADDRALU  */
+    outADDRALU = Low16bits(outADDR1MUX + outLSFH1);
+    printf("outADDRALU = 0x%4x\n", outADDRALU);    
+
+    /*  Set PCMUX  */
+    switch(GetPCMUX(uinstr)){
+    case 0:
+        outPCMUX = CURRENT_LATCHES.PC + 2;
+        break;
+    case 1:
+        break;
+    case 2:
+        outPCMUX = outADDRALU;
+        break;
+    default:
+        printf("Error in PCMUX");
+        break;
+    }
+    outPCMUX = Low16bits(outPCMUX);
+    printf("PCMUX = 0x%4x\n", outPCMUX);
+
+    /*  Set MARMUX  */
+    if(GetMARMUX(uinstr) == 0){
+        outMARMUX = (CURRENT_LATCHES.IR && 0xFF) << 1;
+    }
+    else{
+        outMARMUX = outADDRALU;
+    }
+    outMARMUX = Low16bits(outMARMUX);
+    
+    /*  Set MDR2BUS Logic  */ 
+    if(GetDATA_SIZE(uinstr) == 0 ){
+        /*  Byte  */
+        if(CURRENT_LATCHES.MAR & 0x1){
+            /*  HI byte  */
+            outMDRtoBUSLOGIC = sext( (CURRENT_LATCHES.MDR >> 8) & 0xFF, 8);   
+        }
+        else{
+            /*  LO Byte  */
+            outMDRtoBUSLOGIC = sext(CURRENT_LATCHES.MDR & 0xFF, 8);
+        }
+    }
+    else{
+        /*  Word  */
+        outMDRtoBUSLOGIC = CURRENT_LATCHES.MDR;
+
+    }
+    outMDRtoBUSLOGIC = Low16bits(outMDRtoBUSLOGIC);
 }
 
-
-void drive_bus() {
 
   /* 
    * Datapath routine for driving the bus from one of the 5 possible 
    * tristate drivers. 
    */       
-
-}
-
-
-void latch_datapath_values() {
-
-  /* 
-   * Datapath routine for computing all functions that need to latch
-   * values in the data path at the end of this cycle.  Some values
-   * require sourcing the bus; therefore, this routine has to come 
-   * after drive_bus.
-   */       
-
-}
-
-
