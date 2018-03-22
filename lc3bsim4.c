@@ -632,6 +632,9 @@ int sext(int num, int bits){
 }
   
 
+int EX = 0;		/* signal that goes high whenever there is a memory related exception (unaligned or privelege) */
+int INT = 0;    /* Interupt signal. Is high whenever an interupt is to occur */ 
+
 
 
 /* 
@@ -639,7 +642,7 @@ int sext(int num, int bits){
  * micro sequencer logic. Latch the next microinstruction.
  */
 void eval_micro_sequencer() {	
-	
+		
     
     int COND = GetCOND(CURRENT_LATCHES.MICROINSTRUCTION);
 	int BEN = CURRENT_LATCHES.BEN;
@@ -658,8 +661,18 @@ void eval_micro_sequencer() {
 	int IRD = GetIRD(CURRENT_LATCHES.MICROINSTRUCTION); 
 	int nextStateAddr[6];
     int J = GetJ(CURRENT_LATCHES.MICROINSTRUCTION);
-    
-    if(IRD){
+	int Priv = CURRENT_LATCHES.Priv;
+
+	if(EX){ /* Branch to state 63, the memory access exception state */
+        nextStateAddr[0] = 1;
+        nextStateAddr[1] = 1;
+        nextStateAddr[2] = 1;
+        nextStateAddr[3] = 1;
+        nextStateAddr[4] = 1;
+        nextStateAddr[5] = 1;
+		
+	}
+    else if(IRD){
         nextStateAddr[0] = opcode[0];
         nextStateAddr[1] = opcode[1];
         nextStateAddr[2] = opcode[2];
@@ -671,7 +684,7 @@ void eval_micro_sequencer() {
         nextStateAddr[0] = (J & 0x1) || ( (COND == 3) && IR11);
         nextStateAddr[1] = ( (J >> 1) & 0x1) || ( (COND == 1) && R);
         nextStateAddr[2] = ( (J >> 2) & 0x1) || ( (COND == 2) && BEN);
-        nextStateAddr[3] = ( (J >> 3) & 0x1);
+        nextStateAddr[3] = ( (J >> 3) & 0x1) || ( (COND == 4) && ;
         nextStateAddr[4] = ( (J >> 4) & 0x1);
         nextStateAddr[5] = ( (J >> 5) & 0x1);
 
