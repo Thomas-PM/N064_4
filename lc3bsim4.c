@@ -55,9 +55,9 @@ void latch_datapath_values();
 /***************************************************************/
 /* Definition of bit order in control store word.              */
 /***************************************************************/
-enum CS_BITS {                  //* <- denotes added for lab 4 (interupts and exceptions)                        
+enum CS_BITS {                  /* <- denotes added for lab 4 (interupts and exceptions) */
     IRD,
-    COND2, COND1, COND0,        //* COND2
+    COND2, COND1, COND0,        /* COND2 */
     J5, J4, J3, J2, J1, J0,
     LD_MAR,
     LD_MDR,
@@ -66,34 +66,34 @@ enum CS_BITS {                  //* <- denotes added for lab 4 (interupts and ex
     LD_REG,
     LD_CC,
     LD_PC,
-	LD_PRIV,                    //*
-	LD_SSP,                     //*
-	LD_USP,                     //*
-	LD_VECTOR,                  //*
+	LD_PRIV,                    /**/
+	LD_SSP,                     /**/
+	LD_USP,                     /**/
+	LD_VECTOR,                  /**/
     GATE_PC,
     GATE_MDR,
     GATE_ALU,
     GATE_MARMUX,
     GATE_SHF,
-	GATE_VECTOR,                //*
-	GATE_PC_Minus,              //*
-	GATE_PSR,                   //*
-	GATE_SP,                    //*
+	GATE_VECTOR,                /**/
+	GATE_PC_Minus,              /**/
+	GATE_PSR,                   /**/
+	GATE_SP,                    /**/
     PCMUX1, PCMUX0,
     DRMUX,
     SR1MUX,
     ADDR1MUX,
     ADDR2MUX1, ADDR2MUX0,
-    SP_MUX1, SP_MUX0,           //*
+    SP_MUX1, SP_MUX0,           /**/
     MARMUX,
-	VECTOR_MUX1, VECTOR_MUX0,   //*
-	PSR_MUX,                    //*
+	VECTOR_MUX1, VECTOR_MUX0,   /**/
+	PSR_MUX,                    /**/
     ALUK1, ALUK0,
     MIO_EN,
     R_W,
     DATA_SIZE,
     LSHF1,
-    SET_PRIV,                   //*	
+    SET_PRIV,                   /**/
 /* MODIFY: you have to add all your new control signals */
     CONTROL_STORE_BITS
 } CS_BITS;
@@ -102,7 +102,7 @@ enum CS_BITS {                  //* <- denotes added for lab 4 (interupts and ex
 /* Functions to get at the control bits.                       */
 /***************************************************************/
 int GetIRD(int *x)           { return(x[IRD]); }
-int GetCOND(int *x)          { return((x[cond2] << 2) + (x[COND1] << 1) + x[COND0]); }
+int GetCOND(int *x)          { return((x[COND2] << 2) + (x[COND1] << 1) + x[COND0]); }
 int GetJ(int *x)             { return((x[J5] << 5) + (x[J4] << 4) + (x[J3] << 3) + (x[J2] << 2) + (x[J1] << 1) + x[J0]); }
 int GetLD_MAR(int *x)        { return(x[LD_MAR]); }
 int GetLD_MDR(int *x)        { return(x[LD_MDR]); }
@@ -111,22 +111,34 @@ int GetLD_BEN(int *x)        { return(x[LD_BEN]); }
 int GetLD_REG(int *x)        { return(x[LD_REG]); }
 int GetLD_CC(int *x)         { return(x[LD_CC]); }
 int GetLD_PC(int *x)         { return(x[LD_PC]); }
+int GetLD_PRIV(int *x)       { return(x[LD_PRIV]); }
+int GetLD_SSP(int *x)       { return(x[LD_SSP]); }
+int GetLD_USP(int *x)       { return(x[LD_USP]); }
+int GetLD_VECTOR(int *x)       { return(x[LD_VECTOR]); }
 int GetGATE_PC(int *x)       { return(x[GATE_PC]); }
 int GetGATE_MDR(int *x)      { return(x[GATE_MDR]); }
 int GetGATE_ALU(int *x)      { return(x[GATE_ALU]); }
 int GetGATE_MARMUX(int *x)   { return(x[GATE_MARMUX]); }
 int GetGATE_SHF(int *x)      { return(x[GATE_SHF]); }
+int GetGATE_VECTOR(int *x)       { return(x[GATE_VECTOR]); }
+int GetGATE_PC_MINUS(int *x)       { return(x[GATE_PC_Minus]); }
+int GetGATE_PSR(int *x)       { return(x[GATE_PSR]); }
+int GetGATE_SP(int *x)       { return(x[GATE_SP]); }
 int GetPCMUX(int *x)         { return((x[PCMUX1] << 1) + x[PCMUX0]); }
 int GetDRMUX(int *x)         { return(x[DRMUX]); }
 int GetSR1MUX(int *x)        { return(x[SR1MUX]); }
 int GetADDR1MUX(int *x)      { return(x[ADDR1MUX]); }
 int GetADDR2MUX(int *x)      { return((x[ADDR2MUX1] << 1) + x[ADDR2MUX0]); }
+int GetSP_MUX(int *x)            { return((x[SP_MUX1] << 1) + x[SP_MUX0]); }
 int GetMARMUX(int *x)        { return(x[MARMUX]); }
+int GetVECTOR_MUX(int *x)                 { return((x[VECTOR_MUX1] << 1) + x[VECTOR_MUX0]); }
+int GetPSR_MUX(int *x)       { return(x[PSR_MUX]); }
 int GetALUK(int *x)          { return((x[ALUK1] << 1) + x[ALUK0]); }
 int GetMIO_EN(int *x)        { return(x[MIO_EN]); }
 int GetR_W(int *x)           { return(x[R_W]); }
 int GetDATA_SIZE(int *x)     { return(x[DATA_SIZE]); } 
 int GetLSHF1(int *x)         { return(x[LSHF1]); }
+int GetSET_PRIV(int *x)       { return(x[SET_PRIV]); }
 /* MODIFY: you can add more Get functions for your new control signals */
 
 /***************************************************************/
@@ -184,6 +196,10 @@ int STATE_NUMBER; /* Current State Number - Provided for debugging */
 int INTV; /* Interrupt vector register */
 int EXCV; /* Exception vector register */
 int SSP; /* Initial value of system stack pointer */
+int USP; /* User Stack Pointer save register */
+int Priority; /* Current priority register  */
+int Priv;       /* Current privilege  */
+int Vector;     /* Vector register for interupts and exceptions */
 /* MODIFY: You may add system latches that are required by your implementation */
 
 } System_Latches;
@@ -912,7 +928,105 @@ void eval_bus_drivers() {
 }
 
 
+
   /* 
    * Datapath routine for driving the bus from one of the 5 possible 
    * tristate drivers. 
    */       
+void drive_bus() {
+    int* uinstr = CURRENT_LATCHES.MICROINSTRUCTION;
+    int drives = 0;
+    BUS = 0;
+    if(GetGATE_PC(uinstr) ){
+        BUS = CURRENT_LATCHES.PC;
+        drives ++;
+    }
+    if(GetGATE_ALU(uinstr)){
+        BUS = outALU;
+        drives ++;
+    }
+    if(GetGATE_MDR(uinstr)){
+        BUS = outMDRtoBUSLOGIC;
+        drives ++;
+    }
+    if(GetGATE_SHF(uinstr)){
+        BUS = outSHF;
+        drives ++;
+    }
+    if(GetGATE_MARMUX(uinstr)){
+        BUS = outMARMUX;
+        drives ++;
+    }
+    if(drives > 1){
+        printf("Drive Bus error: number of drives = %i", drives);
+    }
+    BUS = Low16bits(BUS);
+}
+
+
+  /* 
+   * Datapath routine for computing all functions that need to latch
+   * values in the data path at the end of this cycle.  Some values
+   * require sourcing the bus; therefore, this routine has to come 
+   * after drive_bus.
+   */       
+void latch_datapath_values() {
+    int* uinstr = CURRENT_LATCHES.MICROINSTRUCTION;
+    if(GetLD_IR(uinstr)){
+        NEXT_LATCHES.IR = BUS;
+    }
+    if(GetLD_PC(uinstr)){
+        if(GetPCMUX(uinstr) == 1){
+            NEXT_LATCHES.PC = BUS;
+        }
+        else{
+            NEXT_LATCHES.PC = Low16bits(outPCMUX);
+        }
+    }
+    if(GetLD_MAR(uinstr)){
+       NEXT_LATCHES.MAR = BUS;
+    }
+    if(GetLD_MDR(uinstr)){
+        if(!GetMIO_EN(uinstr) ){
+            NEXT_LATCHES.MDR = BUS;
+        }
+    }
+    if(GetLD_CC(uinstr)){
+        NEXT_LATCHES.N = 0;
+        NEXT_LATCHES.Z = 0;
+        NEXT_LATCHES.P = 0;
+        if(BUS == 0){
+            NEXT_LATCHES.Z = 1;
+        }
+        else if( (BUS >> 15) & 0x1){
+            NEXT_LATCHES.N = 1;
+        }
+        else{
+            NEXT_LATCHES.P = 1;
+        }
+
+    }
+    if(GetLD_BEN(uinstr)){
+        int n = ( (CURRENT_LATCHES.IR >> 11) & 0x1) && CURRENT_LATCHES.N;
+        int z = ( (CURRENT_LATCHES.IR >> 10) & 0x1) && CURRENT_LATCHES.Z;
+        int p = ( (CURRENT_LATCHES.IR >> 9) & 0x1) && CURRENT_LATCHES.P;
+        NEXT_LATCHES.BEN = n || z || p;
+        printf("nzp = %d%d%d, BEN = %d\n", n, z, p, NEXT_LATCHES.BEN);
+    }
+    if(GetLD_REG(uinstr)){
+        if(GetDRMUX(uinstr) ){
+            /*  R7  */
+            NEXT_LATCHES.REGS[7] = BUS;
+        }
+        else{
+            /*  IR[11:9]  */
+            NEXT_LATCHES.REGS[ (CURRENT_LATCHES.IR >> 9) & 0x7 ] = BUS; 
+        }
+    }
+    
+
+
+}
+
+
+
