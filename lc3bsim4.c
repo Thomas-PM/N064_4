@@ -241,6 +241,7 @@ void help() {
 /*                                                             */
 /***************************************************************/
 void cycle() {                                                
+  
 
   eval_micro_sequencer();   
   cycle_memory();
@@ -668,7 +669,7 @@ void eval_micro_sequencer() {
         nextStateAddr[3] = 1;
         nextStateAddr[4] = 1;
         nextStateAddr[5] = 1;
-		
+		printf("**************/////////////// MEMORY EXCEPTION  /////////////**********************\n");	
 	}
     else if(IRD){
         nextStateAddr[0] = opcode[0];
@@ -682,17 +683,20 @@ void eval_micro_sequencer() {
         nextStateAddr[0] = (J & 0x1) || ( (COND == 3) && IR11);
         nextStateAddr[1] = ( (J >> 1) & 0x1) || ( (COND == 1) && R);
         nextStateAddr[2] = ( (J >> 2) & 0x1) || ( (COND == 2) && BEN);
-        nextStateAddr[3] = ( (J >> 3) & 0x1) || ( (COND == 4) && CURRENT_LATCHES.Priv);
+        nextStateAddr[3] = ( (J >> 3) & 0x1) || ( (COND == 4) && Priv);
         nextStateAddr[4] = ( (J >> 4) & 0x1) || ( (COND == 5) && INTERUPT);
         nextStateAddr[5] = ( (J >> 5) & 0x1);
 
     }
+	if(INTERUPT){
+		printf("//////////////////////***************** INTERUPT ****************////////////////////\n");
+	}
     int nextState = nextStateAddr[0] + 2*nextStateAddr[1] + 4*nextStateAddr[2] + 8*nextStateAddr[3] + 16*nextStateAddr[4] + 32*nextStateAddr[5];
     printf("**************Current state %d\n", CURRENT_LATCHES.STATE_NUMBER);
     NEXT_LATCHES.STATE_NUMBER = nextState;
     printf("**************NEXT state %d\n",NEXT_LATCHES.STATE_NUMBER);
 	for(i = 0; i < CONTROL_STORE_BITS; i++){
-        printf("%d", CONTROL_STORE[nextState][i]);
+        /* printf("%d", CONTROL_STORE[nextState][i]); */
         NEXT_LATCHES.MICROINSTRUCTION[i] = CONTROL_STORE[nextState][i];
     }
     printf("\n");
@@ -708,6 +712,7 @@ void eval_micro_sequencer() {
  */
 
 int memCycles = 0;
+int TRAP = 0xF;
 
 void cycle_memory() {
     if( GetMIO_EN(CURRENT_LATCHES.MICROINSTRUCTION) ){
@@ -720,7 +725,7 @@ void cycle_memory() {
 			/*  Unaligned Access  */ 
 			NEXT_LATCHES.EXCV = 0x03; 
 		}
-		if( CURRENT_LATCHES.MAR < 0x3000 && CURRENT_LATCHES.Priv == 1){ 
+		if( CURRENT_LATCHES.MAR < 0x3000 && CURRENT_LATCHES.Priv == 1 && (CURRENT_LATCHES.IR >> 12) != TRAP){ 
 			/*  Protection Exception  */ 
 			NEXT_LATCHES.EXCV = 0X02; 
 		} 
@@ -823,15 +828,23 @@ int outSP;
 void eval_bus_drivers() {
     int* uinstr = CURRENT_LATCHES.MICROINSTRUCTION;
     /*  set SR1  */
-    if(GetSR1MUX(uinstr)){
-        outSR1 = CURRENT_LATCHES.REGS[ (CURRENT_LATCHES.IR >> 6) & 0x7];
-    }
-    else{   
-        outSR1 = CURRENT_LATCHES.REGS[ (CURRENT_LATCHES.IR >> 9) & 0x7];
-    }
-	outSR1 = Low16bits(outSR1);
-    printf("SR1 0x%4x\n", outSR1);
-
+    switch(GetSR1MUX(uinstr)){
+        case 0:
+			outSR1 = CURRENT_LATCHES.REGS[ (CURRENT_LATCHES.IR >> 9) & 0x7];
+			break;
+		case 1:
+        	outSR1 = CURRENT_LATCHES.REGS[ (CURRENT_LATCHES.IR >> 6) & 0x7];
+			break;
+		case 2:
+            outSR1 = CURRENT_LATCHES.REGS[6]; 
+            break;
+        default:
+            printf("ERROR IN SR1MUX\n");
+            break;
+	}
+    outSR1 = Low16bits(outSR1);
+    printf("SR1 = 0x%4x\n", outSR1);
+    
     /*  set SR2  */
     if( (CURRENT_LATCHES.IR >> 5) & 0x1){
         outSR2MUX = sext(CURRENT_LATCHES.IR & 0x1F, 5);
@@ -840,7 +853,9 @@ void eval_bus_drivers() {
         outSR2MUX = CURRENT_LATCHES.REGS[ (CURRENT_LATCHES.IR) & 0x3];
     }
     outSR2MUX = Low16bits(outSR2MUX);
-	
+	printf("SR2 = 0x%4x\n", outSR2MUX);
+
+
     /*  Set ALU  */	
     switch(GetALUK(uinstr)) {
     case 0:
@@ -862,7 +877,9 @@ void eval_bus_drivers() {
         break;
     }
     outALU = Low16bits(outALU);
-    
+    printf("ALU output: 0x%4x\n", outALU);
+
+
 
     /*  Set SHF  */
     int amount4 = (CURRENT_LATCHES.IR & 0xF);
@@ -903,7 +920,6 @@ void eval_bus_drivers() {
         break;
     }
     outADDR2MUX = Low16bits(outADDR2MUX);
-    printf("outADDR2MUX = 0x%4x\n", outADDR2MUX);
     
     /*  Set LSFH1  */
     if(GetLSHF1(uinstr)){
@@ -913,7 +929,6 @@ void eval_bus_drivers() {
         outLSFH1 = outADDR2MUX;
     }
     outLSFH1 = Low16bits(outLSFH1);
-    printf("LSHF1 = 0x%4x\n", outLSFH1);
 
     /*  Set ADDR1MUX  */
     if(GetADDR1MUX(uinstr) == 0){
@@ -923,11 +938,9 @@ void eval_bus_drivers() {
         outADDR1MUX = outSR1;
     }
     outADDR1MUX = Low16bits(outADDR1MUX);
-    printf("ADDR1MUX = 0x%4x\n", outADDR1MUX);
 
     /*  Set ADDRALU  */
     outADDRALU = Low16bits(outADDR1MUX + outLSFH1);
-    printf("outADDRALU = 0x%4x\n", outADDRALU);    
 
     /*  Set PCMUX  */
     switch(GetPCMUX(uinstr)){
@@ -944,7 +957,6 @@ void eval_bus_drivers() {
         break;
     }
     outPCMUX = Low16bits(outPCMUX);
-    printf("PCMUX = 0x%4x\n", outPCMUX);
 
     /*  Set MARMUX  */
     if(GetMARMUX(uinstr) == 0){
@@ -1106,6 +1118,8 @@ void drive_bus() {
         printf("Drive Bus error: number of drives = %i", drives);
     }
     BUS = Low16bits(BUS);
+    printf("bbbbbbbb  BUS driven to 0x%4x\n", BUS);
+
 }
 
 
@@ -1160,13 +1174,22 @@ void latch_datapath_values() {
         printf("nzp = %d%d%d, BEN = %d\n", n, z, p, NEXT_LATCHES.BEN);
     }
     if(GetLD_REG(uinstr)){
-        if(GetDRMUX(uinstr) ){
-            /*  R7  */
-            NEXT_LATCHES.REGS[7] = BUS;
-        }
-        else{
-            /*  IR[11:9]  */
-            NEXT_LATCHES.REGS[ (CURRENT_LATCHES.IR >> 9) & 0x7 ] = BUS; 
+        switch(GetDRMUX(uinstr) ){
+            case 0: 
+                /*  IR[11:9]  */
+                NEXT_LATCHES.REGS[ (CURRENT_LATCHES.IR >> 9) & 0x7 ] = BUS; 
+                break;
+            case 1:
+                /*  R7  */
+                NEXT_LATCHES.REGS[7] = BUS;
+                break;
+            case 2:
+                /*  R6  */
+                NEXT_LATCHES.REGS[6] = BUS;
+                break;
+            defualt:
+                printf("ERROR: LATCHING DESTINATION REGISTER");
+                break;
         }
     }
     if(GetLD_VECTOR(uinstr)){
