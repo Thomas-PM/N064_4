@@ -28,7 +28,7 @@ stb r5 r1 #0
 
 halt
 data .fill xC000
-tostore .fill x0000
-;tostore .fill xC014
+;tostore .fill x0000
+tostore .fill xC014
 toinit .fill x4000
 .end
