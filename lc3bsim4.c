@@ -80,8 +80,8 @@ enum CS_BITS {                  /* <- denotes added for lab 4 (interupts and exc
 	GATE_PSR,                   /**/
 	GATE_SP,                    /**/
     PCMUX1, PCMUX0,
-    DRMUX,
-    SR1MUX,
+    DRMUX1, DRMUX0,
+    SR1MUX1, SR1MUX0,
     ADDR1MUX,
     ADDR2MUX1, ADDR2MUX0,
     SP_MUX1, SP_MUX0,           /**/
@@ -125,8 +125,8 @@ int GetGATE_PC_MINUS(int *x)       { return(x[GATE_PC_Minus]); }
 int GetGATE_PSR(int *x)       { return(x[GATE_PSR]); }
 int GetGATE_SP(int *x)       { return(x[GATE_SP]); }
 int GetPCMUX(int *x)         { return((x[PCMUX1] << 1) + x[PCMUX0]); }
-int GetDRMUX(int *x)         { return(x[DRMUX]); }
-int GetSR1MUX(int *x)        { return(x[SR1MUX]); }
+int GetDRMUX(int *x)         { return(x[DRMUX1] << 1) + x[DRMUX0]; }
+int GetSR1MUX(int *x)        { return(x[SR1MUX1] << 1) + x[SR1MUX0]; }
 int GetADDR1MUX(int *x)      { return(x[ADDR1MUX]); }
 int GetADDR2MUX(int *x)      { return((x[ADDR2MUX1] << 1) + x[ADDR2MUX0]); }
 int GetSP_MUX(int *x)            { return((x[SP_MUX1] << 1) + x[SP_MUX0]); }
@@ -1039,7 +1039,7 @@ void eval_bus_drivers() {
     }
 
 
-    /* Set out*/
+    /* Set outSP */
     switch(GetSP_MUX(uinstr)){
     case 0:
         outSP = CURRENT_LATCHES.SSP;
@@ -1191,4 +1191,5 @@ void latch_datapath_values() {
 
 }
 
+/* TODO: allow TRAP to access System memory */
 	
