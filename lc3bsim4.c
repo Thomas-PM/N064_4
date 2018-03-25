@@ -692,6 +692,8 @@ void eval_micro_sequencer() {
 		printf("//////////////////////***************** INTERUPT ****************////////////////////\n");
 	}
     int nextState = nextStateAddr[0] + 2*nextStateAddr[1] + 4*nextStateAddr[2] + 8*nextStateAddr[3] + 16*nextStateAddr[4] + 32*nextStateAddr[5];
+    printf("___________________________________________________\n");
+    printf("Cycle: %d\n", CYCLE_COUNT);
     printf("**************Current state %d\n", CURRENT_LATCHES.STATE_NUMBER);
     NEXT_LATCHES.STATE_NUMBER = nextState;
     printf("**************NEXT state %d\n",NEXT_LATCHES.STATE_NUMBER);
@@ -850,7 +852,7 @@ void eval_bus_drivers() {
         outSR2MUX = sext(CURRENT_LATCHES.IR & 0x1F, 5);
     }
     else{
-        outSR2MUX = CURRENT_LATCHES.REGS[ (CURRENT_LATCHES.IR) & 0x3];
+        outSR2MUX = CURRENT_LATCHES.REGS[ (CURRENT_LATCHES.IR) & 0x7];
     }
     outSR2MUX = Low16bits(outSR2MUX);
 	printf("SR2 = 0x%4x\n", outSR2MUX);
@@ -1010,42 +1012,6 @@ void eval_bus_drivers() {
 
     outPCMUX = Low16bits(outPCMUX);
 
-    /* CC Logic Output */
-    outN_Logic = 0;
-    outZ_Logic = 0;
-    outP_Logic = 0;
-    if(BUS == 0){
-        outZ_Logic = 1;
-    }
-    else if( (BUS >> 15) & 0x1){
-        outN_Logic = 1;
-    }
-    else{
-        outP_Logic = 1;
-    }
-    
-    
-    /*  Set out PSR data path (excluding priority for now)  */
-    if(GetPSR_MUX(uinstr) == 0){
-        /* Load from Bus */
-        outN_mux = (BUS >> 2) & 0x1;
-        outZ_mux = (BUS >> 1) & 0x1;
-        outP_mux = (BUS & 0x1);
-        outPriv_mux = GetSET_PRIV(CURRENT_LATCHES.MICROINSTRUCTION);
-
-        /*outPriority = (CURRENT_LATCHES.BUS[10] >> 8) + (CURRENT_LATCHES.BUS[9] >> 8) + (CURRENT_LATCHES.BUS[8] >> 0); */
-
-
-    }
-    else{
-        /* Evaluate */
-        outN_mux = outN_Logic;
-        outZ_mux = outZ_Logic;
-        outP_mux = outP_Logic;
-        outPriv_mux = GetSET_PRIV(CURRENT_LATCHES.MICROINSTRUCTION); 
-        /* outPriority = interupt_priority; */
-    }
-
 
     /* Set outSP */
     switch(GetSP_MUX(uinstr)){
@@ -1151,6 +1117,43 @@ void latch_datapath_values() {
         }
     }
     if(GetLD_CC(uinstr)){
+        /* CC Logic Output */
+        outN_Logic = 0;
+        outZ_Logic = 0;
+        outP_Logic = 0;
+        if(BUS == 0){
+            outZ_Logic = 1;
+        }
+        else if( (BUS >> 15) & 0x1){
+            outN_Logic = 1;
+        }
+        else{
+            outP_Logic = 1;
+        }
+        printf("Logic NZP= %d%d%d\n", outN_Logic, outZ_Logic, outP_Logic);
+        
+        
+        /*  Set out PSR data path (excluding priority for now)  */
+        if(GetPSR_MUX(uinstr) == 1){
+            /* Load from Bus */
+            outN_mux = (BUS >> 2) & 0x1;
+            outZ_mux = (BUS >> 1) & 0x1;
+            outP_mux = (BUS & 0x1);
+            outPriv_mux = GetSET_PRIV(CURRENT_LATCHES.MICROINSTRUCTION);
+
+            /*outPriority = (CURRENT_LATCHES.BUS[10] >> 8) + (CURRENT_LATCHES.BUS[9] >> 8) + (CURRENT_LATCHES.BUS[8] >> 0); */
+
+
+        }
+        else{
+            /* Evaluate */
+            outN_mux = outN_Logic;
+            outZ_mux = outZ_Logic;
+            outP_mux = outP_Logic;
+            outPriv_mux = GetSET_PRIV(CURRENT_LATCHES.MICROINSTRUCTION); 
+            /* outPriority = interupt_priority; */
+        }
+        printf("OUT NZP= %d%d%d\n", outN_mux, outZ_mux, outP_mux);
         NEXT_LATCHES.N = outN_mux;
         NEXT_LATCHES.Z = outZ_mux;
         NEXT_LATCHES.P = outP_mux;
