@@ -172,6 +172,8 @@ int RUN_BIT;			/* run bit */
 int BUS;				/* value of the bus */
 int interupt_priority;	/* priority of the current interupt (externally driven */ 
 int INTERUPT;			/* interupt signal (INT) */
+int EX;			/* Memory access exception */
+
 typedef struct System_Latches_Struct{
 
 int PC,		/* program counter */
@@ -201,7 +203,6 @@ int USP; 		/* User Stack Pointer save register */
 int Priority; 	/* Current priority register  */
 int Priv;       /* Current privilege  */
 int Vector;     /* Vector register for interupts and exceptions */
-int EX;			/* Memory access exception */
 /* MODIFY: You may add system latches that are required by your implementation */
 
 } System_Latches;
@@ -556,6 +557,7 @@ void initialize(char *ucode_filename, char *program_filename, int num_prog_files
 	load_program(program_filename);
 	while(*program_filename++ != '\0');
     }
+    CURRENT_LATCHES.Priv = 1;
     CURRENT_LATCHES.Z = 1;
     CURRENT_LATCHES.STATE_NUMBER = INITIAL_STATE_NUMBER;
     memcpy(CURRENT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[INITIAL_STATE_NUMBER], sizeof(int)*CONTROL_STORE_BITS);
@@ -647,7 +649,6 @@ void eval_micro_sequencer() {
 	int R  = CURRENT_LATCHES.READY;
  	int IR11 = (CURRENT_LATCHES.IR >> 11) & 0x1;
 	int Priv = CURRENT_LATCHES.Priv;
-    INTERUPT = 		
 
 	int opcode[4];
     int i = 0;
@@ -660,7 +661,7 @@ void eval_micro_sequencer() {
 	int IRD = GetIRD(CURRENT_LATCHES.MICROINSTRUCTION); 
 	int nextStateAddr[6];
     int J = GetJ(CURRENT_LATCHES.MICROINSTRUCTION);
-	if(CURRENT_LATCHES.EX && COND == 1){ /* Branch to state 63, the memory access exception state */
+	if(EX && COND == 1){ /* Branch to state 63, the memory access exception state */
         nextStateAddr[0] = 1;
         nextStateAddr[1] = 1;
         nextStateAddr[2] = 1;
@@ -682,7 +683,7 @@ void eval_micro_sequencer() {
         nextStateAddr[1] = ( (J >> 1) & 0x1) || ( (COND == 1) && R);
         nextStateAddr[2] = ( (J >> 2) & 0x1) || ( (COND == 2) && BEN);
         nextStateAddr[3] = ( (J >> 3) & 0x1) || ( (COND == 4) && CURRENT_LATCHES.Priv);
-        nextStateAddr[4] = ( (J >> 4) & 0x1) || ( (COND == 5) && CURRENT_LATCHES.INT);
+        nextStateAddr[4] = ( (J >> 4) & 0x1) || ( (COND == 5) && INTERUPT);
         nextStateAddr[5] = ( (J >> 5) & 0x1);
 
     }
@@ -715,7 +716,7 @@ void cycle_memory() {
 		/*  Check for Exception  */
 		NEXT_LATCHES.EXCV = 0;
         EX = 0; 
-		if(GetDATA_SIZE(CURRENT_LATCHES.MICROINSTRUCTION) == 1 && CURRENT_LATCHES.MAR[0] == 1){
+		if(GetDATA_SIZE(CURRENT_LATCHES.MICROINSTRUCTION) == 1 && CURRENT_LATCHES.MAR%2 == 1){
 			/*  Unaligned Access  */ 
 			NEXT_LATCHES.EXCV = 0x03; 
 		}
@@ -799,7 +800,7 @@ int outP_Logic;
 int outP_mux;
 int outZ_Logic;
 int outZ_mux;
-//int outPriority;
+/* int outPriority; */
 int outPriv_mux;
 int outSP;
 
@@ -985,16 +986,12 @@ void eval_bus_drivers() {
             outVectorMux = 0x04;
             break;
         default:
-            outVectorMux = 0x99;
-            break
+            outVectorMux = 0x02;
+            break;
     }
-
-    outVectorMux = Low16bits(outVectorMux);
-
-    /*  Set outVector  */
-    outVector = CURRENT_LATCHES.Vector;
     
-    outVector = Low16bits(outVector);
+    outVectorMux = (0x0200) +(outVectorMux << 1);
+    outVectorMux = Low16bits(outVectorMux);
 
     /*  Set outPC-  */
     outPCMinus = CURRENT_LATCHES.PC - 2;
@@ -1019,10 +1016,10 @@ void eval_bus_drivers() {
     /*  Set out PSR data path (excluding priority for now)  */
     if(GetPSR_MUX(uinstr) == 0){
         /* Load from Bus */
-        outN_mux = CURRENT_LATCHES.BUS[2];
-        outZ_mux = CURRENT_LATCHES.BUS[1];
-        outP_mux = CURRENT_LATCHES.BUS[0];
-        outPriv_mux = CURRENT_LATCHES.SET_PRIV;
+        outN_mux = (BUS >> 2) & 0x1;
+        outZ_mux = (BUS >> 1) & 0x1;
+        outP_mux = (BUS & 0x1);
+        outPriv_mux = GetSET_PRIV(CURRENT_LATCHES.MICROINSTRUCTION);
 
         /*outPriority = (CURRENT_LATCHES.BUS[10] >> 8) + (CURRENT_LATCHES.BUS[9] >> 8) + (CURRENT_LATCHES.BUS[8] >> 0); */
 
@@ -1033,8 +1030,7 @@ void eval_bus_drivers() {
         outN_mux = outN_Logic;
         outZ_mux = outZ_Logic;
         outP_mux = outP_Logic;
-        outPriv_mux = CURRENT_LATCHES.SET_PRIV;
-
+        outPriv_mux = GetSET_PRIV(CURRENT_LATCHES.MICROINSTRUCTION); 
         /* outPriority = interupt_priority; */
     }
 
@@ -1055,7 +1051,7 @@ void eval_bus_drivers() {
         break;
     default:
         /* Error condition */
-        outSP = xFFFF;
+        outSP = 0xFFFF;
         break;
     }
     outSP = Low16bits(outSP);
@@ -1099,10 +1095,7 @@ void drive_bus() {
         drives ++;
     }
     if(GetGATE_PSR(uinstr)){
-        BUS [15] = CURRENT_LATCHES.Priv;
-        BUS [0] = CURRENT_LATCHES.P;
-        BUS [1] = CURRENT_LATCHES.Z;
-        BUS [2] = CURRENT_LATCHES.N;
+        BUS = ( CURRENT_LATCHES.Priv << 15) + (CURRENT_LATCHES.N << 2) + (CURRENT_LATCHES.Z << 1) +CURRENT_LATCHES.P;
         drives ++;
     }
     if(GetGATE_SP(uinstr)){
