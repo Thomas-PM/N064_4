@@ -172,7 +172,7 @@ int RUN_BIT;			/* run bit */
 int BUS;				/* value of the bus */
 int interupt_priority;	/* priority of the current interupt (externally driven */ 
 int INTERUPT;			/* interupt signal (INT) */
-int EX;			/* Memory access exception */
+/*int EX;			 Memory access exception */
 
 typedef struct System_Latches_Struct{
 
@@ -203,6 +203,8 @@ int USP; 		/* User Stack Pointer save register */
 int Priority; 	/* Current priority register  */
 int Priv;       /* Current privilege  */
 int Vector;     /* Vector register for interupts and exceptions */
+
+int EX;         /* Exception call from memory access  */
 /* MODIFY: You may add system latches that are required by your implementation */
 
 } System_Latches;
@@ -644,7 +646,7 @@ int sext(int num, int bits){
  * micro sequencer logic. Latch the next microinstruction.
  */
 void eval_micro_sequencer() {	
-	 
+	
     int COND = GetCOND(CURRENT_LATCHES.MICROINSTRUCTION);
 	int BEN = CURRENT_LATCHES.BEN;
 	int R  = CURRENT_LATCHES.READY;
@@ -662,7 +664,8 @@ void eval_micro_sequencer() {
 	int IRD = GetIRD(CURRENT_LATCHES.MICROINSTRUCTION); 
 	int nextStateAddr[6];
     int J = GetJ(CURRENT_LATCHES.MICROINSTRUCTION);
-	if(EX && COND == 1){ /* Branch to state 63, the memory access exception state */
+    NEXT_LATCHES.EX = 0;
+	if(CURRENT_LATCHES.EX && COND == 1){ /* Branch to state 63, the memory access exception state */
         nextStateAddr[0] = 1;
         nextStateAddr[1] = 1;
         nextStateAddr[2] = 1;
@@ -722,18 +725,21 @@ void cycle_memory() {
 	
 		/*  Check for Exception  */
 		NEXT_LATCHES.EXCV = 0;
-        EX = 0; 
 		if(GetDATA_SIZE(CURRENT_LATCHES.MICROINSTRUCTION) == 1 && CURRENT_LATCHES.MAR%2 == 1){
 			/*  Unaligned Access  */ 
+            printf("++++++++++++++++++  unaligned access ++++++++++++++++++++++++++++++++\n");
 			NEXT_LATCHES.EXCV = 0x03; 
 		}
 		if( CURRENT_LATCHES.MAR < 0x3000 && CURRENT_LATCHES.Priv == 1 && (CURRENT_LATCHES.IR >> 12) != TRAP){ 
+            printf("------------------  privelege access (curr priv = %i -------------------------------\n", CURRENT_LATCHES.Priv);
 			/*  Protection Exception  */ 
 			NEXT_LATCHES.EXCV = 0X02; 
 		} 
 		if( NEXT_LATCHES.EXCV != 0){ 
 			/* There is a memory based exception, raise EX signal  */ 
-			EX = 1; 
+    		NEXT_LATCHES.EX = 1; 
+			memCycles = 0;
+            return;
 		}
 
         if(CURRENT_LATCHES.READY){
@@ -1010,7 +1016,7 @@ void eval_bus_drivers() {
     /*  Set outPC-  */
     outPCMinus = CURRENT_LATCHES.PC - 2;
 
-    outPCMUX = Low16bits(outPCMUX);
+    outPCMinus = Low16bits(outPCMinus);
 
 
     /* Set outSP */
@@ -1033,6 +1039,7 @@ void eval_bus_drivers() {
         break;
     }
     outSP = Low16bits(outSP);
+    printf("outSP = 0x%4x, from SP_MUX = %i\n", outSP, GetSP_MUX(uinstr) );
 }
 
 
@@ -1084,7 +1091,8 @@ void drive_bus() {
         printf("Drive Bus error: number of drives = %i", drives);
     }
     BUS = Low16bits(BUS);
-    printf("bbbbbbbb  BUS driven to 0x%4x\n", BUS);
+    printf("SSP = 0x%4x, USP = 0x%4x, INTV = 0x2%x, EXCV = 0x%2x, Vector = 0x%4x, EX = %i\n", CURRENT_LATCHES.SSP, CURRENT_LATCHES.USP, CURRENT_LATCHES.INTV, CURRENT_LATCHES.EXCV, CURRENT_LATCHES.Vector, CURRENT_LATCHES.EX); 
+    printf("      -- BUS driven to 0x%4x\n", BUS);
 
 }
 
@@ -1188,15 +1196,17 @@ void latch_datapath_values() {
                 break;
             case 2:
                 /*  R6  */
+                printf("Stack Pointer loaded\n");
                 NEXT_LATCHES.REGS[6] = BUS;
                 break;
             defualt:
-                printf("ERROR: LATCHING DESTINATION REGISTER");
+                printf("ERROR: LATCHING DESTINATION REGISTER\n");
                 break;
         }
     }
     if(GetLD_VECTOR(uinstr)){
         NEXT_LATCHES.Vector = outVectorMux;
+        printf("Load vector with 0x%4x\n", outVectorMux);
     }
     if(GetLD_PRIV(uinstr)){
         NEXT_LATCHES.Priv = outPriv_mux;
