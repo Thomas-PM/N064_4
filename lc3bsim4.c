@@ -171,7 +171,6 @@ int MEMORY[WORDS_IN_MEM][2];
 int RUN_BIT;			/* run bit */
 int BUS;				/* value of the bus */
 int interupt_priority;	/* priority of the current interupt (externally driven */ 
-int INTERUPT;			/* interupt signal (INT) */
 /*int EX;			 Memory access exception */
 
 typedef struct System_Latches_Struct{
@@ -205,6 +204,7 @@ int Priv;       /* Current privilege  */
 int Vector;     /* Vector register for interupts and exceptions */
 
 int EX;         /* Exception call from memory access  */
+int INTERUPT;			/* interupt signal (INT) */
 /* MODIFY: You may add system latches that are required by your implementation */
 
 } System_Latches;
@@ -647,6 +647,10 @@ int sext(int num, int bits){
  */
 void eval_micro_sequencer() {	
 	
+    if(CYCLE_COUNT == 299){
+        NEXT_LATCHES.INTERUPT = 1; /*  Request interupt signal  */
+        NEXT_LATCHES.INTV = 0x01;
+    }
     int COND = GetCOND(CURRENT_LATCHES.MICROINSTRUCTION);
 	int BEN = CURRENT_LATCHES.BEN;
 	int R  = CURRENT_LATCHES.READY;
@@ -665,6 +669,7 @@ void eval_micro_sequencer() {
 	int nextStateAddr[6];
     int J = GetJ(CURRENT_LATCHES.MICROINSTRUCTION);
     NEXT_LATCHES.EX = 0;
+    printf("___________________________________________________\n");
 	if(CURRENT_LATCHES.EX && COND == 1){ /* Branch to state 63, the memory access exception state */
         nextStateAddr[0] = 1;
         nextStateAddr[1] = 1;
@@ -687,15 +692,15 @@ void eval_micro_sequencer() {
         nextStateAddr[1] = ( (J >> 1) & 0x1) || ( (COND == 1) && R);
         nextStateAddr[2] = ( (J >> 2) & 0x1) || ( (COND == 2) && BEN);
         nextStateAddr[3] = ( (J >> 3) & 0x1) || ( (COND == 4) && Priv);
-        nextStateAddr[4] = ( (J >> 4) & 0x1) || ( (COND == 5) && INTERUPT);
+        nextStateAddr[4] = ( (J >> 4) & 0x1) || ( (COND == 5) && CURRENT_LATCHES.INTERUPT);
         nextStateAddr[5] = ( (J >> 5) & 0x1);
 
     }
-	if(INTERUPT){
+	if(CURRENT_LATCHES.INTERUPT && CURRENT_LATCHES.STATE_NUMBER == 18 || CURRENT_LATCHES.STATE_NUMBER == 19){
 		printf("//////////////////////***************** INTERUPT ****************////////////////////\n");
+        NEXT_LATCHES.INTERUPT = 0; 
 	}
     int nextState = nextStateAddr[0] + 2*nextStateAddr[1] + 4*nextStateAddr[2] + 8*nextStateAddr[3] + 16*nextStateAddr[4] + 32*nextStateAddr[5];
-    printf("___________________________________________________\n");
     printf("Cycle: %d\n", CYCLE_COUNT);
     printf("**************Current state %d\n", CURRENT_LATCHES.STATE_NUMBER);
     NEXT_LATCHES.STATE_NUMBER = nextState;
@@ -1091,7 +1096,7 @@ void drive_bus() {
         printf("Drive Bus error: number of drives = %i", drives);
     }
     BUS = Low16bits(BUS);
-    printf("SSP = 0x%4x, USP = 0x%4x, INTV = 0x2%x, EXCV = 0x%2x, Vector = 0x%4x, EX = %i\n", CURRENT_LATCHES.SSP, CURRENT_LATCHES.USP, CURRENT_LATCHES.INTV, CURRENT_LATCHES.EXCV, CURRENT_LATCHES.Vector, CURRENT_LATCHES.EX); 
+    printf("SSP = 0x%4x, USP = 0x%4x, INTV = 0x%2x, EXCV = 0x%2x, Vector = 0x%4x, EX = %i, INTERUPT = %i\n", CURRENT_LATCHES.SSP, CURRENT_LATCHES.USP, CURRENT_LATCHES.INTV, CURRENT_LATCHES.EXCV, CURRENT_LATCHES.Vector, CURRENT_LATCHES.EX, CURRENT_LATCHES.INTERUPT); 
     printf("      -- BUS driven to 0x%4x\n", BUS);
 
 }
